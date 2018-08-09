@@ -16,9 +16,8 @@
  (2) Add offline mode to spray water @ given time and show current status (hum,temp,water spray
  time) when internet is unavailable.
  
- (3) While did,uid empty MQTT connected and disconnected contineously: solution:I used same gloabal variable 
- for getting spray time and uid,did  
-
+ (3) While did,uid empty MQTT connected and disconnected contineously: solution:I subscribed to empty topics
+ before constructing the topics
 Device is subscribed to:
 
 Topic----------------------------------------------------Msg.
@@ -29,7 +28,7 @@ When no did and uid assigned only then subscribed to
 
 (1) mushroom/uid/did/user_input=========2(pump on),3(pump off),4(fan off),5(fan on)
 (2)  mushroom/uid/did/time=============00:00,00:00,00:00,00:00,00:00
-(3) mushroom/uid/did/chk-status========1
+(3) mushroom/uid/did/chk_status========1
 (4) mushroom/uid/did/temp=============temerature threshold (an integer)
 (5) mushroom/uid/did/reset============1
 (6) mushroom/uid/did/deviceTime=======1
@@ -44,7 +43,7 @@ mushroom/uid/did/sensor_data========================hum,temp,co2,light
 mushroom/uid/did/fan_status=========================on/off
 mushroom/uid/did/ack=================================1 (after water spray for 1 minutes)
 
-mushroom/uid/did/currentTime========================publishig current time read from RTC
+mushroom/uid/did/current_time========================publishig current time read from RTC
 mushroom/uid/did/configack===========================1 when device configuration is done
 mushroom/uid/did/pump_status=========================on/off
 
@@ -60,22 +59,22 @@ mushroom/uid/did/pump_status=========================on/off
  */
 
 //-----------------------------Including required libraries---------------------------------------------------//
-//#include "SPIFFS.h"
-//#include <time.h> // Library to read time from server
-//#include "RTClib.h"
-//RTC_DS3231 rtc;
-//#include "DHTesp.h"             //library: https://github.com/beegee-tokyo/DHTesp
+#include "SPIFFS.h"
+#include <time.h> // Library to read time from server
+#include "RTClib.h"
+RTC_DS3231 rtc;
+#include "DHTesp.h"             //library: https://github.com/beegee-tokyo/DHTesp
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include "EEPROM.h"
-//#include <DNSServer.h>
+#include <DNSServer.h>
 //#include <ESP8266WebServer.h>
 //#include <WiFiManager.h>         //https://github.com/tzapu/WiFiManager
-//#include <ArduinoJson.h>
-//#include <ESP32Ticker.h>
-//#include <Wire.h>
+#include <ArduinoJson.h>
+#include <ESP32Ticker.h>
+#include <Wire.h>
 
-//Ticker secondTick;
+Ticker secondTick;
 
 //https://github.com/bblanchon/ArduinoJson
 char* ssid="DataSoft_WiFi";
@@ -107,7 +106,7 @@ PubSubClient client(espClient);
 #define EEPROM_SIZE 200
 
 
-long data_publishing_interval=300000;
+long data_publishing_interval=60000;
 long clock_reading_interval=50000;
 
 
@@ -220,8 +219,8 @@ char projectName[]="mushroom/";
 char commonTopic0[50]="/user_input";
 char commonTopic1[50]="/temp";
 char commonTopic2[50]="/time";
-char commonTopic3[50]="/chk-status";
-char commonTopic4[50]="/deviceTime";
+char commonTopic3[50]="/chk_status";
+char commonTopic4[50]="/device_time";
 char commonTopic5[50]="/reset";
 //char commonTopic6[50]="/clearEEPROM";
 //char commonTopic7[50]="/checkEEPROM";
@@ -230,9 +229,9 @@ char commonTopic5[50]="/reset";
 char commonTopic8[50]="/sensor_data";
 char commonTopic9[50]="/fan_status";
 char commonTopic10[50]="/ack";
-char commonTopic11[50]="/online";
-char commonTopic12[50]="/currentTime";
-char commonTopic13[50]="/configack";
+//char commonTopic11[50]="/online";
+char commonTopic12[50]="/current_time";
+char commonTopic13[50]="/configAck";
 char commonTopic14[50]="/pump_status";
 
 
@@ -254,7 +253,7 @@ char uid[24]={'0'};
 
 //Sensor data storing variable:
 
-//DHTesp dht;
+DHTesp dht;
 int data1=0;
 int data2=0;
 int data3=0;
@@ -267,20 +266,20 @@ unsigned long previousMillis = 0;
 //------------------------WATCH DOG SUBROUTINE-------------------------------//
 
 //int watchdogCount=0;
-//volatile int watchdogCount=0;
-//void ISRwatchdog(){
-//
-//
-//  watchdogCount++;
-//  if(watchdogCount==100){
-//
-//
-//    //Serial.println();
-//    Serial.print("The watch dog bites......");
-//    ESP.restart();
-//  }
-//}
-//
+volatile int watchdogCount=0;
+void ISRwatchdog(){
+
+
+  watchdogCount++;
+  if(watchdogCount==100){
+
+
+    //Serial.println();
+    Serial.print("The watch dog bites......");
+    ESP.restart();
+  }
+}
+
 
 
 //--------------------------------------------Main Set up----------------------------------------------//
@@ -292,7 +291,7 @@ void setup() {
   
   // put your setup code here, to run once:
 
-//  secondTick.attach(1,ISRwatchdog);
+  secondTick.attach(1,ISRwatchdog);
   
   Serial.begin(115200);
   Serial.println("");
@@ -317,7 +316,7 @@ void setup() {
 
   //initialize sensor reading pins
   
-//  dht.setup(dht_dpin,DHTesp::DHTTYPE);
+  dht.setup(dht_dpin,DHTesp::DHTTYPE);
   pinMode(light_sensor,INPUT);
   pinMode(dht_dpin,INPUT);
   pinMode(co2_sensor,INPUT);
@@ -329,7 +328,7 @@ void setup() {
   
   setup_wifi();
 
-  //config_RTC();
+  config_RTC();
   
    
   client.setServer(mqtt_server,mqttPort);
@@ -344,7 +343,7 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
 
-//   watchdogCount=0;
+   watchdogCount=0;
   //Serial.println(watchdogCount);
   
   if (!client.connected()) {
@@ -357,15 +356,15 @@ void loop() {
 
 //-----------Reading SensorData--------------//
   
-//  data1=temp();
-//  data2=hum();
-//  delay(200);
-//  data3=co2();
-//  data4=light();
+  data1=temp();
+  data2=hum();
+  delay(200);
+  data3=co2();
+  data4=light();
 
 
 
-     // if (data1<50){
+    if (data1<50){
 
 /*     display_hum();
        delay(500);
@@ -374,35 +373,35 @@ void loop() {
        display_water_spray_time();
        delay(2000);
   */
-      // sensor_data_publish();
+       sensor_data_publish();
       //Controlling AC based on user threshold
-      //ac_Control();
+      ac_Control();
       
 
  
-//}
+}
 //------------------------------------------Reading clock @ every 50s interval---------------------------//
 
 
-//  unsigned long currentMillis=millis();
-//  if(currentMillis-previousMillis>clock_reading_interval)
-//  {
-//  previousMillis=currentMillis;  
-//  actual_time_rtc();
-//  delay(500); 
-//  
-//  
-//  Serial.print("Actual time:");
-//  Serial.println(Clock2);
-//
-//  readingSprayTimeFromEEPROM();
-//  }
+  unsigned long currentMillis=millis();
+  if(currentMillis-previousMillis>clock_reading_interval)
+  {
+  previousMillis=currentMillis;  
+  actual_time_rtc();
+  delay(500); 
+  
+  
+  Serial.print("Actual time:");
+  Serial.println(Clock2);
+
+  readingSprayTimeFromEEPROM();
+  }
 
 
   //turn on pump & fan for 1 min while 
   //current time==spray time
 
-   //waterSpray();
+   waterSpray();
   } //End of main loop
 
 //------------------------------------------------While client not conncected---------------------------------//
@@ -438,6 +437,7 @@ void reconnect() {
                   if(strlen(did)==0 && strlen(uid)==0){
                     
                     client.subscribe("mushroom/config");
+                    Serial.println("subscribed to mushroom/config");
                     digitalWrite(configPin,LOW);
                   }
                   
@@ -449,7 +449,7 @@ void reconnect() {
                     
                    
                     Serial.println("You already have did and uid assigned");
-                    Serial.println("Unsubscribed from: mushroom/config");
+                    Serial.println("Unsubscribed from: mushroom/configData");
                     
                     Serial.print("did:");
                     Serial.println(did);
@@ -474,14 +474,10 @@ void reconnect() {
                           Serial.println(topic13);
 
                           digitalWrite(configPin,HIGH);//lighting up config indicator
-                          client.publish(topic13,"1");                      
+                          client.publish(topic13,"yes");                      
                           constructTopic();
 
-                      
-                  }
-
-
-//-----------------------------Subscribing to required topics----------------------------------------//
+                          //-----------------------------Subscribing to required topics----------------------------------------//
 
                           
                         
@@ -498,6 +494,12 @@ void reconnect() {
                           client.subscribe(topic5);
                           Serial.println("Subscribed to /reset");
                       
+
+                      
+                  }
+
+
+
       
       
             
@@ -817,39 +819,43 @@ void setup_wifi() {
     Serial.println(ssid);
     WiFi.begin(ssid, password);
     while (WiFi.status() != WL_CONNECTED) 
+    
     {
+      digitalWrite(WiFiPin,LOW);
       delay(500);
       Serial.print(".");
     }
     randomSeed(micros());
     Serial.println("");
     Serial.println("WiFi connected");
+    digitalWrite(WiFiPin,HIGH);//lighting up wifi indicator
     Serial.println("IP address: ");
     Serial.println(WiFi.localIP());
+    
 
 }
 
 //----------------------------------RTC config-----------------------------------------------------------//
 
-//void config_RTC(){
-//
-//    if (! rtc.begin()) {
-//    Serial.println("Couldn't find RTC");
-//    while (1);
-//  
-//}
-//
-//configTime(timezone * 3600, 0, "bd.pool.ntp.org", "bsti1.time.gov.bd");
-//
-//for(int i=0;i<9;++i){
-//actual_time_server();
-//delay(1000);
-//}
-//adjustedHour=h.toInt();
-//adjustedMinute=m.toInt();
-//rtc.adjust(DateTime(2018, 7, 17, adjustedHour, adjustedMinute, 00));
-//
-//}
+void config_RTC(){
+
+    if (! rtc.begin()) {
+    Serial.println("Couldn't find RTC");
+    while (1);
+  
+}
+
+configTime(timezone * 3600, 0, "bd.pool.ntp.org", "bsti1.time.gov.bd");
+
+for(int i=0;i<9;++i){
+actual_time_server();
+delay(1000);
+}
+adjustedHour=h.toInt();
+adjustedMinute=m.toInt();
+rtc.adjust(DateTime(2018, 7, 17, adjustedHour, adjustedMinute, 00));
+
+}
 
 //-------------------------Getting actual time from server-----------------------------------------------//
 
@@ -883,45 +889,45 @@ void actual_time_server(){
 //---------------------------Reading current time from RTC------------------------------------------------------//
 
 
-//void actual_time_rtc(){
-//
-//
-//  DateTime now=rtc.now();
-//  
-//  h2=String(now.hour(),DEC);
-//  
-//  hour_length2=h2.length();
-//  if(hour_length2==1){
-//  h2="0"+h2;
-//  }
-//  
-//  m2=String(now.minute(),DEC);
-//  minute_length2=m2.length();
-//  if(minute_length2==1){
-//  m2="0"+m2;
-//  }  
-//  
-//  
-//  Clock2=h2+":"+m2;
-//
-//  Serial.print("Clock2:");
-//  Serial.println(Clock2);
-//  
-//  
-//  if(Clock2=="165:165"){
-//  for(int i=0;i<5;++i){
-//          actual_time_server();
-//          delay(1000);
-//          }
-//    adjustedHour=h.toInt();
-//    adjustedMinute=m.toInt();
-//    rtc.adjust(DateTime(2018, 7, 17, adjustedHour, adjustedMinute, 00));
-//   
-//    }
-//  
-//  
-//delay(1000);  
-// }
+void actual_time_rtc(){
+
+
+  DateTime now=rtc.now();
+  
+  h2=String(now.hour(),DEC);
+  
+  hour_length2=h2.length();
+  if(hour_length2==1){
+  h2="0"+h2;
+  }
+  
+  m2=String(now.minute(),DEC);
+  minute_length2=m2.length();
+  if(minute_length2==1){
+  m2="0"+m2;
+  }  
+  
+  
+  Clock2=h2+":"+m2;
+
+  Serial.print("Clock2:");
+  Serial.println(Clock2);
+  
+  
+  if(Clock2=="165:165"){
+  for(int i=0;i<5;++i){
+          actual_time_server();
+          delay(1000);
+          }
+    adjustedHour=h.toInt();
+    adjustedMinute=m.toInt();
+    rtc.adjust(DateTime(2018, 7, 17, adjustedHour, adjustedMinute, 00));
+   
+    }
+  
+  
+delay(1000);  
+ }
 
 
 
@@ -1260,10 +1266,10 @@ strcat(topic10,commonTopic10);
 Serial.print("topic10:");
 Serial.println(topic10);
 
-strcpy(topic11,projectName);
-strcat(topic11,commonTopic11);
-Serial.print("topic11:");
-Serial.println(topic11);
+//strcpy(topic11,projectName);
+//strcat(topic11,commonTopic11);
+//Serial.print("topic11:");
+//Serial.println(topic11);
 
 strcpy(topic12,projectName);
 strcat(topic12,commonTopic12);
@@ -1283,58 +1289,58 @@ Serial.println(topic14);
 //-------------------------------Reading Sensor Data--------------------------------------------//
 
 
-//int temp()
-//{
-//  
-//  //int t = dht.readTemperature(); 
-//  int t=dht.getTemperature();
-////  Serial.print("Temperature:");
-////  Serial.println(t);        
-//  return t;
-//   
-//  }
-//
-//int hum()
-//{
-//  //int h = dht.readHumidity();
-//  int h=dht.getHumidity();
-////  Serial.print("Humidity:");
-////  Serial.println(h);
-//  return h;
-//  
-//  }
-//
-//int co2(){
-//
-//int co2now[10];//long array for co2 readings
-//int co2raw=0;  //long for raw value of co2
-//int co2comp = 0;   //long for compensated co2 
-//int co2ppm = 0;    //long for calculated ppm
-//int sum=0;
-//for (int x=0;x<10;x++){
-//
-//co2now[x]=analogRead(co2_sensor);
-//sum=sum+co2now[x];
-//}
-//co2raw=sum/10;
-//co2raw=co2raw-55;
-//co2ppm=map(co2raw,0,4095,300,2000);
-//
-////Serial.print("co2 in ppm:");
-////Serial.println(co2ppm);
-//return co2ppm; 
-//  
-//}
-//
-//
-//int light(){
-//  
-//  int l = analogRead(light_sensor);
-//  int light_intensity=map(l,0,4095,80,400);
-////  Serial.print("light:");
-////  Serial.println(light_intensity);
-//  return light_intensity;
-//}
+int temp()
+{
+  
+  //int t = dht.readTemperature(); 
+  int t=dht.getTemperature();
+//  Serial.print("Temperature:");
+//  Serial.println(t);        
+  return t;
+   
+  }
+
+int hum()
+{
+  //int h = dht.readHumidity();
+  int h=dht.getHumidity();
+//  Serial.print("Humidity:");
+//  Serial.println(h);
+  return h;
+  
+  }
+
+int co2(){
+
+int co2now[10];//long array for co2 readings
+int co2raw=0;  //long for raw value of co2
+int co2comp = 0;   //long for compensated co2 
+int co2ppm = 0;    //long for calculated ppm
+int sum=0;
+for (int x=0;x<10;x++){
+
+co2now[x]=analogRead(co2_sensor);
+sum=sum+co2now[x];
+}
+co2raw=sum/10;
+co2raw=co2raw-55;
+co2ppm=map(co2raw,0,4095,300,2000);
+
+//Serial.print("co2 in ppm:");
+//Serial.println(co2ppm);
+return co2ppm; 
+  
+}
+
+
+int light(){
+  
+  int l = analogRead(light_sensor);
+  int light_intensity=map(l,0,4095,80,400);
+//  Serial.print("light:");
+//  Serial.println(light_intensity);
+  return light_intensity;
+}
 
 
 //------------------------------Publishing sensor data every 5 minutes----------------------------------//
