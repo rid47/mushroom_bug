@@ -231,7 +231,7 @@ char commonTopic9[50]="/fan_status";
 char commonTopic10[50]="/ack";
 char commonTopic11[50]="/online";
 char commonTopic12[50]="/currentTime";
-char commonTopic13[50]="/configack";
+char commonTopic13[50]="/configAck";
 char commonTopic14[50]="/pump_status";
 
 
@@ -436,20 +436,20 @@ void reconnect() {
 
                   if(strlen(did)==0 && strlen(uid)==0){
                     
-                    client.subscribe("mushroom/config");
-                    Serial.println("subscribed to mushroom/config");
+                    client.subscribe("mushroom/configure");
+                    Serial.println("subscribed to mushroom/configure");
                     digitalWrite(configPin,LOW);
                   }
                   
                   if(strlen(did)!=0 && strlen(uid)!=0){
 
-                    client.unsubscribe("mushroom/config");
+                    client.unsubscribe("mushroom/configure");
                     
                     
                     
                    
                     Serial.println("You already have did and uid assigned");
-                    Serial.println("Unsubscribed from: mushroom/config");
+                    Serial.println("Unsubscribed from: mushroom/configure");
                     
                     Serial.print("did:");
                     Serial.println(did);
@@ -474,7 +474,7 @@ void reconnect() {
                           Serial.println(topic13);
 
                           digitalWrite(configPin,HIGH);//lighting up config indicator
-                          client.publish(topic13,"1");                      
+                          client.publish(topic13,"yes");                      
                           constructTopic();
 
                           //-----------------------------Subscribing to required topics----------------------------------------//
@@ -529,7 +529,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
   
 //-------------------------------------Getting config data---------------------//
 
-if(strcmp(topic, "mushroom/config") == 0){
+if(strcmp(topic, "mushroom/configure") == 0){
 
 
   Serial.print("Message:");
@@ -1271,6 +1271,12 @@ strcpy(topic12,projectName);
 strcat(topic12,commonTopic12);
 Serial.print("topic12:");
 Serial.println(topic12);
+
+
+strcpy(topic13,projectName);
+strcat(topic13,commonTopic13);
+Serial.print("topic13:");
+Serial.println(topic13);
 
 strcpy(topic14,projectName);
 strcat(topic14,commonTopic14);
