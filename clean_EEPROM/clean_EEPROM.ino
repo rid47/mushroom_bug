@@ -26,7 +26,7 @@ void setup() {
     
     }
     
-    for (int i = 100 ; i < 130; i++) {
+    for (int i = 100 ; i < 135; i++) {
     EEPROM.write(i, 0);
     
     }
