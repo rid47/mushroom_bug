@@ -78,7 +78,7 @@ Ticker secondTick;
 
 //https://github.com/bblanchon/ArduinoJson
 char* ssid="DataSoft_WiFi";
-char* password="support1234";
+char* password="support123";
 
 //MQTT  credentials
 
@@ -851,14 +851,14 @@ void setup_wifi() {
     {
       delay(500);
       Serial.print(".");
-      deviceOnline=0;
+//      deviceOnline=0;
       //Doing offline duty (water spray and ac control)
 
-      readSensorData();
-      ac_Control();
-      actual_time_rtc();
-      waterSpray();
-      
+//      readSensorData();
+//      ac_Control();
+//      actual_time_rtc();
+//      waterSpray();
+//      
       
 }
     randomSeed(micros());
@@ -866,7 +866,7 @@ void setup_wifi() {
     Serial.println("WiFi connected");
     Serial.println("IP address: ");
     Serial.println(WiFi.localIP());
-     deviceOnline=1;
+     //deviceOnline=1;
 }
 
 //----------------------------------RTC config-----------------------------------------------------------//
